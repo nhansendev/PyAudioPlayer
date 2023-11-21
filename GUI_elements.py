@@ -114,6 +114,9 @@ class SongTable(QTableWidget):
 
     def next(self):
         indexes = self.get_visible_rows()
+        if len(indexes) < 1:
+            return
+
         try:
             row = indexes.index(self.get_selected_row_index()) + 1
             if row >= len(indexes):
@@ -126,6 +129,9 @@ class SongTable(QTableWidget):
 
     def prev(self):
         indexes = self.get_visible_rows()
+        if len(indexes) < 1:
+            return
+
         try:
             row = indexes.index(self.get_selected_row_index()) - 1
             if row < 0:
@@ -138,6 +144,9 @@ class SongTable(QTableWidget):
 
     def rand(self):
         indexes = self.get_visible_rows()
+        if len(indexes) < 1:
+            return
+
         try:
             curr = indexes.index(self.get_selected_row_index())
         except ValueError:

@@ -13,6 +13,7 @@ from threading import Event
 from formatting import FormatLabel
 from GUI_elements import *
 from utils import sec_to_HMS, find_songs
+import sys
 
 
 import platform
@@ -251,27 +252,22 @@ class MainWindow(QMainWindow):
         self.play_buttons.add_checkbox("Shuffle", None, False)
 
     def add_entries(self, data):
-        for d in data:
-            self.song_table.add_row(d)
+        if data is not None:
+            for d in data:
+                self.song_table.add_row(d)
 
 
 if __name__ == "__main__":
-    songpaths = [
-        "/mnt/StorageM2/Songs",
-        "D:\\Songs",
-    ]
-    foundpath = None
-    for path in songpaths:
-        if os.path.exists(path):
-            foundpath = path
-            break
-
-    if foundpath is None:
-        print("Error: no valid song folder path found!")
+    try:
+        path = sys.argv[1]
+        if not os.path.exists(path):
+            raise
+    except IndexError:
+        path = ""
 
     app = QApplication()
 
-    window = MainWindow(foundpath)
+    window = MainWindow(path)
     window.show()
 
     app.exec()
