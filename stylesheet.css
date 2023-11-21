@@ -1,0 +1,197 @@
+QMainWindow {
+    background-color: rgb(0, 0, 0);
+}
+
+EditWindow {
+    background-color: black;
+    color:white;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+EditWindow QPushButton {
+    background-color: rgb(25, 25, 25);
+    color: white;
+    font-family: "DejaVu Sans Mono";
+    font-size: 15px;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+EditWindow QPushButton:hover {
+    color: lime;
+}
+
+EditWindow QLabel {
+    color: lime;
+    /* font-weight: bold; */
+    background-color: rgb(10, 10, 10);
+    font-family: "DejaVu Sans Mono";
+}
+
+EditWindow HeaderLabel {
+    color: lime;
+    /* font-weight: bold; */
+    background-color: rgb(25, 25, 25);
+    font-family: "DejaVu Sans Mono";
+}
+
+EditWindow QLineEdit {
+    background-color: rgb(40, 40, 40);
+    color: white;
+    border: none;
+}
+
+TitleBar {
+    background-color: rgb(40, 40, 40);
+    color:white;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+TitleBar QPushButton {
+    background-color: rgb(25, 25, 25);
+    color: white;
+    font-family: "DejaVu Sans Mono";
+    font-size: 15px;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+TitleBar QPushButton:hover {
+    background-color: red;
+    color: black;
+}
+
+TitleBar TitleLabel {
+    color: white;
+    font-weight: bold;
+    background-color: rgb(40, 40, 40);
+    font-family: "DejaVu Sans Mono";
+    font-size: 15px;
+}
+
+QLabel {
+    color: rgb(0, 200, 0);
+    /* font-weight: bold; */
+    background-color: rgb(0, 0, 0);
+    font-family: "DejaVu Sans Mono";
+}
+
+FormatLabel {
+    color: rgb(0, 200, 0);
+    /* font-weight: bold; */
+    background-color: rgb(0, 0, 0);
+    font-family: "DejaVu Sans Mono";
+    font-size: 15px;
+    /* border: 1px solid gray; */
+}
+
+QPushButton {
+    background-color: rgb(25, 25, 25);
+    color: white;
+    font-family: "DejaVu Sans Mono";
+    border: 1px solid rgb(50, 50, 50);
+}
+
+QPushButton:hover {
+    color: lime;
+}
+
+QPushButton:checked {
+    background-color: rgb(25, 50, 25);
+}
+
+QLineEdit {
+    background-color: rgb(40, 40, 40);
+    color: white;
+    border: none;
+}
+
+QComboBox {
+    background-color: rgb(40, 40, 40);
+    color: white;
+}
+
+QSlider {
+    background-color: black;
+}
+
+QSlider::groove {
+    color: rgb(25, 25, 25);
+}
+
+QSlider::handle {
+    border: 1px solid rgb(50, 50, 50);
+    background-color: rgb(50, 50, 50);
+}
+
+QSlider::handle:horizontal {
+    width: 10px;
+}
+
+QSlider::handle:vertical {
+    height: 10px;
+}
+
+QCheckBox {
+    color: white;
+}
+
+QCheckBox:indicator {
+    /* background-color: rgb(40, 40, 40); */
+    color: white;
+}
+
+QTableWidget {
+    alternate-background-color: rgb(40, 40, 40);
+    background-color: black;
+    color: rgb(0, 200, 0);
+    font-family: "DejaVu Sans Mono";
+}
+
+QTableView::item:selected {
+    background-color: rgb(100, 0, 0);
+    color: white;
+}
+
+QHeaderView{
+    background-color: rgb(40, 40, 40);
+    color: white;
+}
+
+QHeaderView::section{
+    background-color: rgb(40, 40, 40);
+    color: white;
+}
+
+QHeaderView::section:checked{
+    background-color: rgb(40, 40, 40);
+    color: white;
+}
+
+QTableCornerButton::section{
+    background-color: rgb(40, 40, 40);
+    color: white;
+}
+
+
+/* QSlider::handle {
+    background: QRadialGradient(cx: 0.5, cy: 0.5, radius: 1, fx: 0.5, fy: 0.5, stop: 0 lime, stop: 1 black);
+    border: 1px solid #777;
+    width: 10px;
+    height: 10px;
+    border-radius: 4px;
+}
+
+QSlider::groove::horizontal {
+    background-color: white;
+    color: green;
+    height: 5px;
+    border: 1px solid #777;
+    border-radius: 4px;
+}
+
+QSlider::groove::vertical {
+    background-color: white;
+    color: green;
+    width: 5px;
+    border: 1px solid #777;
+    border-radius: 4px;
+} */
