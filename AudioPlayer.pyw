@@ -1,14 +1,15 @@
+# Copyright (c) 2023, Nathan Hansen
+# All rights reserved.
+
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 from PySide6.QtWidgets import *
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
-
-# from qt_material import apply_stylesheet
-
 from just_playback import Playback
 import os
-
 from threading import Event
-
 from formatting import FormatLabel
 from GUI_elements import *
 from utils import sec_to_HMS, find_songs
@@ -38,10 +39,8 @@ class audioplayer:
         self,
         music_folder,
         extensions=[".mp3", ".wav"],
-        cfg_dir=None,
     ):
         self.filepath = music_folder
-        self.cfg_dir = music_folder if cfg_dir is None else cfg_dir
         self.extensions = extensions
 
         if not os.path.exists(self.filepath):
@@ -91,14 +90,13 @@ class MainWindow(QMainWindow):
         self,
         music_folder,
         extensions=[".mp3", ".wav"],
-        cfg_dir=None,
     ):
         super().__init__()
 
         self._editing_event = Event()
         self.load_stylesheet()
 
-        self.player = audioplayer(music_folder, extensions, cfg_dir)
+        self.player = audioplayer(music_folder, extensions)
         self.edit_window = None
         self.music_folder = music_folder
         self._play_on_load = True
@@ -217,7 +215,7 @@ class MainWindow(QMainWindow):
             ss = f.read()
         self.setStyleSheet(ss)
 
-    def seek_update(self, value):
+    def seek_update(self, *args):
         self.player.seek(self.play_buttons.seek_slider.get_slider_pct())
 
     def refresh_table(self):
