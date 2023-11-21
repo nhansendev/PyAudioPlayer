@@ -13,7 +13,6 @@ An audio player GUI with yt_dlp integration, made in python using PySide6.
 >pip install -r requirements.txt
 - PySide6
 - just_playback
-- mutagen
-- tinytag
-- pycaw
+- ffmpeg-python
+- pycaw (windows only)
 - yt_dlp
