@@ -1,0 +1,7 @@
+just_playback
+ffmpeg-python
+pycaw
+yt_dlp
+PySide6
+pydub
+tqdm
