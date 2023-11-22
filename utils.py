@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
+import sys
 import subprocess
 from metadata import read_metadata, check_normalized, set_normalized
 from multiprocessing import get_context, Pool
@@ -136,5 +137,10 @@ def volume_normalizer(basepath, songs=None):
 
 
 if __name__ == "__main__":
-    basedir = "D:\\Songs"
-    volume_normalizer(basedir)
+    try:
+        path = sys.argv[1]
+        if not os.path.exists(path):
+            raise
+        volume_normalizer(path)
+    except IndexError:
+        pass
