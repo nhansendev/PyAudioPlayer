@@ -5,21 +5,29 @@
 # LICENSE file in the root directory of this source tree.
 
 from PySide6.QtWidgets import *
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QObject, Slot, QThread
 
 from formatting import SliderProxyStyle, HeaderLabel, TitleLabel, FormatLabel
 from element_bases import ClickableSlider, LineEditDefaultText, ytd
-from metadata import write_metadata
+from metadata import write_metadata, check_normalized, read_metadata
+from utils import _norm, _search_dir, sec_to_HMS
 
 from functools import partial
 import random
 import os
-from functools import partial
+import time
 from interruptable_thread import ThreadWithExc
 import yt_dlp
+from multiprocessing import Pool, cpu_count, Event
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_stylesheet(obj):
+    with open(os.path.join(SCRIPT_DIR, "stylesheet.css"), "r") as f:
+        ss = f.read()
+    obj.setStyleSheet(ss)
 
 
 class SongTable(QTableWidget):
@@ -295,7 +303,7 @@ class SeekSlider(ClickableSlider):
 
 
 class VolumeSlider(QWidget):
-    def __init__(self, horizontal=False, vmin=0, vmax=100, vstep=5):
+    def __init__(self, horizontal=False, vmin=0, vmax=100, vstep=1):
         super().__init__()
 
         self.reserved = False
@@ -347,7 +355,7 @@ class EditWindow(QWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setContentsMargins(0, 0, 0, 0)
 
-        self.load_stylesheet()
+        load_stylesheet(self)
 
         self.music_folder = music_folder
         self.msg_label = msg_label
@@ -407,10 +415,13 @@ class EditWindow(QWidget):
         self.cancel_button.pressed.connect(self.close)
         self.layout.addWidget(self.cancel_button, 3, 3)
 
-    def load_stylesheet(self):
-        with open(os.path.join(SCRIPT_DIR, "stylesheet.css"), "r") as f:
-            ss = f.read()
-        self.setStyleSheet(ss)
+    def move_to_center(self, parent, override_x=None, override_y=None):
+        px = override_x if override_x is not None else parent.x()
+        py = override_y if override_y is not None else parent.y()
+
+        pw, ph = parent.width(), parent.height()
+
+        self.move(px + pw / 2 - self.width() / 2, py + ph / 2 - self.height() / 2)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Enter:
@@ -432,6 +443,7 @@ class EditWindow(QWidget):
                 genre=tmp[1],
                 year=tmp[2],
             )
+            self.msg_label.setText(f"Updated metadata of: {tmp[0]}")
 
         if tmp[0] != self.old_data[0]:
             try:
@@ -478,9 +490,10 @@ class AZLinks(QWidget):
 
 
 class TitleBar(QWidget):
-    def __init__(self, window, title, close_only=False):
+    def __init__(self, window, title, hide_on_close=False, close_only=False):
         super().__init__()
 
+        self.hide_on_close = hide_on_close
         self.parent = window
         self.maxNormal = False
         self.setAutoFillBackground(True)
@@ -527,7 +540,10 @@ class TitleBar(QWidget):
             self.maxNormal = True
 
     def _close(self):
-        self.parent.close()
+        if self.hide_on_close:
+            self.parent.hide()
+        else:
+            self.parent.close()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -707,3 +723,302 @@ class DLFrame(QWidget):
         self.closed = True
         self.finished = True
         self.can_close = True
+
+
+# TODO: thread may continue even after popup window is closed. This is not good.
+class NormWorkerThread(QObject):
+    done = Signal()
+    check_progress = Signal()
+    norm_progress = Signal()
+    convert_qty = Signal(int)
+    finished = Signal()
+
+    def __init__(self, songs, music_folder, interrupt_event) -> None:
+        super().__init__()
+
+        self.songs = songs
+        self.music_folder = music_folder
+        self.interrupt_event = interrupt_event
+
+    @Slot()
+    def run(self):
+        # TODO: parallelize?
+        to_convert = []
+        for s in self.songs:
+            path = os.path.join(self.music_folder, s)
+            if not check_normalized(path):
+                to_convert.append(path)
+            self.check_progress.emit()
+            if self.interrupt_event.is_set():
+                self.finished.emit()
+                return
+
+        self.convert_qty.emit(len(to_convert))
+
+        if len(to_convert) > 0:
+            with Pool(max(1, cpu_count() - 1)) as p:
+                for _ in p.imap_unordered(_norm, to_convert):
+                    self.norm_progress.emit()
+                    if self.interrupt_event.is_set():
+                        self.finished.emit()
+                        return
+
+        self.done.emit()
+        self.finished.emit()
+
+
+# TODO: popup window may remain open even after main window is closed. Allowable?
+class NormalizerWindow(QWidget):
+    def __init__(self, music_folder, songs, msg_label, norm_event):
+        super().__init__()
+
+        self.music_folder = music_folder
+        self.songs = songs
+        self.msg_label = msg_label
+        self.norm_event = norm_event
+        self._check_progress = 0
+        self._norm_progress = 0
+        self._progress_bar_chars = 50
+        self._interrupt_event = Event()
+        self._do_norm = False
+
+        # Apparently the only "space" character that is consistently wide
+        self._just_char = "\u2007"  # "Figure Space"
+
+        self.setFixedWidth(510)
+        self.setMinimumHeight(120)
+
+        self.setAutoFillBackground(True)
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setContentsMargins(0, 0, 0, 0)
+
+        load_stylesheet(self)
+
+        self.title_layout = QVBoxLayout()
+        self.title_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(self.title_layout)
+
+        self.layout = QVBoxLayout()
+        self.layout_widget = QWidget()
+        self.layout_widget.setLayout(self.layout)
+        self.layout.setContentsMargins(3, 0, 3, 3)
+        self.layout.setSpacing(3)
+
+        self.title = TitleBar(self, "Normalize Songs", close_only=True)
+
+        self.title_layout.addWidget(self.title)
+        self.title_layout.addWidget(self.layout_widget, stretch=1)
+
+        self.status_label = QLabel(f"Checking {len(songs)} loaded song(s)...")
+        self.layout.addWidget(self.status_label)
+
+        self.progress_bar = QLabel("0% | ".rjust(7, self._just_char))
+        self.layout.addWidget(self.progress_bar)
+
+        self.status_label2 = QLabel("")
+        self.layout.addWidget(self.status_label2)
+
+        self.progress_bar2 = QLabel("0% | ".rjust(7, self._just_char))
+        self.layout.addWidget(self.progress_bar2)
+
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setMinimumWidth(50)
+        self.layout.addWidget(self.cancel_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+        self.normalize()
+
+    def normalize(self):
+        self.worker = NormWorkerThread(
+            self.songs, self.music_folder, self._interrupt_event
+        )
+        self.worker.done.connect(self._done)
+        self.worker.check_progress.connect(self._increment_check_progress)
+        self.worker.norm_progress.connect(self._increment_norm_progress)
+        self.worker.convert_qty.connect(self._to_convert_update)
+
+        self.thread = QThread()
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+
+    @Slot()
+    def _to_convert_update(self, qty):
+        if qty > 0:
+            self.status_label2.setText(f"Normalizing {qty} songs...")
+            self.cancel_button.pressed.connect(self._cancel_thread)
+            self._do_norm = True
+        else:
+            self.status_label2.setText("Nothing found to normalize.")
+            self.progress_bar2.setText("")
+
+    def _cancel_thread(self):
+        self._interrupt_event.set()
+        pct = (
+            f"{int(self._norm_progress / len(self.songs)*100)}% | ".rjust(
+                7, self._just_char
+            )
+            + "Cancelled"
+        )
+        self.progress_bar2.setText(pct)
+        self._done()
+
+    @Slot()
+    def _done(self, *args):
+        self.cancel_button.setText("Ok")
+        if self._do_norm:
+            # This will fail at runtime if there is nothing to disconnect
+            # Lack of clear error message is a pain
+            self.cancel_button.pressed.disconnect()
+        self.cancel_button.pressed.connect(self.close)
+
+    @Slot()
+    def _increment_check_progress(self, *args):
+        self._check_progress += 1
+        rat = self._check_progress / len(self.songs)
+        pct = f"{int(rat*100)}% | ".rjust(7, self._just_char) + "▒" * int(
+            rat * self._progress_bar_chars
+        )
+        self.progress_bar.setText(pct)
+
+    @Slot()
+    def _increment_norm_progress(self, *args):
+        self._norm_progress += 1
+        rat = self._norm_progress / len(self.songs)
+        pct = f"{int(rat*100)}% | ".rjust(7, self._just_char) + "▒" * int(
+            rat * self._progress_bar_chars
+        )
+        self.progress_bar2.setText(pct)
+
+    def close(self):
+        self.norm_event.clear()
+        super().close()
+
+
+class LoadingBarWindow(QWidget):
+    done = Signal(list)
+
+    def __init__(self, filepath, extensions=[".mp3", ".wav"]):
+        super().__init__()
+        self.filepath = filepath
+        self.extensions = extensions
+        self._progress = 0
+        self._progress_bar_chars = 50
+        self.songs = []
+
+        self.setWindowFlags(Qt.WindowStaysOnTopHint)
+
+        self.find_songs()
+
+        self._just_char = "\u2007"  # "Figure Space"
+
+        self.setFixedWidth(510)
+        self.setMinimumHeight(120)
+
+        self.setAutoFillBackground(True)
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setContentsMargins(0, 0, 0, 0)
+
+        load_stylesheet(self)
+
+        self.title_layout = QVBoxLayout()
+        self.title_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(self.title_layout)
+
+        self.layout = QVBoxLayout()
+        self.layout_widget = QWidget()
+        self.layout_widget.setLayout(self.layout)
+        self.layout.setContentsMargins(3, 3, 3, 3)
+        self.layout.setSpacing(3)
+
+        self.title = TitleBar(
+            self, "Read Metadata", hide_on_close=True, close_only=True
+        )
+
+        self.title_layout.addWidget(self.title)
+        self.title_layout.addWidget(self.layout_widget, stretch=1)
+
+        self.status_label = QLabel(f"Loading {len(self.songs)} song(s)...")
+        self.layout.addWidget(self.status_label)
+
+        self.progress_bar = QLabel("0% | ".rjust(7, self._just_char))
+        self.layout.addWidget(self.progress_bar)
+
+    def reset(self):
+        self.find_songs()
+        self._progress = 0
+        self.status_label.setText(f"Loading {len(self.songs)} song(s)...")
+        self.progress_bar.setText("0% | ".rjust(7, self._just_char))
+
+    def find_songs(self):
+        if not os.path.exists(self.filepath):
+            print("ERROR: Provided directory is not accessible!")
+            return
+
+        self.songs = _search_dir(self.filepath, self.extensions)
+
+        if len(self.songs) == 0:
+            print(
+                f"ERROR: No files with given extension(s) {self.extensions} found in directory!"
+            )
+            return
+
+        # Sort by title using lowercase characters
+        self.songs.sort(key=lambda x: x.lower())
+
+    @Slot()
+    def _increment_progress(self, *args):
+        self._progress += 1
+        rat = self._progress / len(self.songs)
+        pct = f"{int(rat*100)}% | ".rjust(7, self._just_char) + "▒" * int(
+            rat * self._progress_bar_chars
+        )
+        self.progress_bar.setText(pct)
+
+    def _done(self, data):
+        self.done.emit(data)
+
+    def load_metadata(self):
+        if len(self.songs) > 0:
+            self.worker = MetadataWorkerThread(self.songs, self.filepath)
+            self.worker.done.connect(self.hide)
+            self.worker.progress.connect(self._increment_progress)
+            self.worker.data.connect(self._done)
+
+            self.thread = QThread()
+            self.worker.moveToThread(self.thread)
+            self.thread.started.connect(self.worker.run)
+            self.worker.finished.connect(self.thread.quit)
+            self.worker.finished.connect(self.worker.deleteLater)
+            self.thread.finished.connect(self.thread.deleteLater)
+            self.thread.start()
+
+
+class MetadataWorkerThread(QObject):
+    done = Signal()
+    progress = Signal()
+    data = Signal(list)
+    finished = Signal()
+
+    def __init__(self, songs, music_folder) -> None:
+        super().__init__()
+
+        self.songs = songs
+        self.music_folder = music_folder
+
+    @Slot()
+    def run(self):
+        out = []
+        for s in self.songs:
+            data = read_metadata(os.path.join(self.music_folder, s))
+            out.append([s, sec_to_HMS(data[0])] + data[1:])
+            self.progress.emit()
+            # time.sleep(0.02)
+
+        self.data.emit(out)
+        self.done.emit()
+        self.finished.emit()

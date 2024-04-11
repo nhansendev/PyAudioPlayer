@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from PySide6.QtWidgets import *
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 import os
 import yt_dlp
 
@@ -13,9 +13,10 @@ import yt_dlp
 class ReservedSlider(QSlider):
     # Tracks whether the user is interacting with the slider
     # Useful for preventing self-updates to the slider position at the wrong time
-    def __init__(self):
+    def __init__(self, unreserve_delay=1000):
         super().__init__()
 
+        self.unreserve_delay = unreserve_delay
         self.reserved = False
 
     def mouseReleaseEvent(self, event):

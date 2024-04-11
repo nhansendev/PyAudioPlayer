@@ -6,34 +6,45 @@
 
 import os
 import ffmpeg
+import mutagen
 
 
 def read_metadata(path):
     if not os.path.isfile(path):
-        return "Unknown", None
-
-    tag = ffmpeg.probe(path)["format"]["tags"]
+        return [0, "Unknown", None]
 
     try:
-        genre = tag["genre"]
-    except KeyError:
-        genre = "Unknown"
+        file = mutagen.File(path)
+    except mutagen.mp3.HeaderNotFoundError:
+        return [0, "Unknown", None]
 
-    try:
-        year = tag["year"]
-    except KeyError:
-        year = None
+    tags = file.tags
+    duration = file.info.length
 
-    return [genre, year]
+    genre = "Unknown"
+    year = None
+    for k in tags.keys():
+        if "tcon" in k.lower():
+            # TCON is an official, recognised tag representing genre
+            genre = tags[k]
+
+        if "year" in k.lower():
+            # Year is not an official tag and is stored as TXXX:Year as a custom entry
+            year = tags[k]
+
+    return [duration, genre, year]
 
 
 def check_normalized(path):
-    tag = ffmpeg.probe(path)["format"]["tags"]
-
-    if "Norm" in tag.keys():
-        return tag["Norm"] == "True"
-    else:
+    try:
+        tags = mutagen.File(path).tags
+    except mutagen.mp3.HeaderNotFoundError:
         return False
+
+    for k in tags.keys():
+        if "norm" in k.lower():
+            return True
+    return False
 
 
 def set_normalized(basepath, songname, state):
@@ -73,6 +84,28 @@ def write_metadata(basepath, songname, genre, year):
         },
     )
     out = ffmpeg.overwrite_output(out)
-    ffmpeg.run(out)
+    ffmpeg.run(out, quiet=True)
 
     os.replace(tmp_name, original_name)
+
+
+if __name__ == "__main__":
+    import time
+    import mutagen
+
+    folder = "D:\\Songs"
+    songpath = "D:\\Songs\\3 Doors Down - Here Without You.mp3"
+
+    print(mutagen.File(songpath).info.length)
+
+    # N = 100
+    # st = time.time()
+    # for _ in range(N):
+    #     mutagen.File(songpath).keys()
+    #     # read_metadata(songpath)
+    # print(f"{(time.time()-st)/N:.3f} sec avg")
+
+    # st = time.time()
+    # for f in os.listdir(folder):
+    #     read_metadata(f)
+    # print(f"{time.time()-st:.3f} sec")

@@ -27,6 +27,56 @@ EditWindow QLabel {
     font-family: "DejaVu Sans Mono";
 }
 
+NormalizerWindow {
+    background-color: black;
+    color:white;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+NormalizerWindow QPushButton {
+    background-color: rgb(25, 25, 25);
+    color: white;
+    font-family: "DejaVu Sans Mono";
+    font-size: 15px;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+NormalizerWindow QPushButton:hover {
+    color: lime;
+}
+
+NormalizerWindow QLabel {
+    color: lime;
+    /* font-weight: bold; */
+    background-color: rgb(10, 10, 10);
+    font-family: "DejaVu Sans Mono";
+}
+
+LoadingBarWindow {
+    background-color: black;
+    color:white;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+LoadingBarWindow QPushButton {
+    background-color: rgb(25, 25, 25);
+    color: white;
+    font-family: "DejaVu Sans Mono";
+    font-size: 15px;
+    border: 1px solid rgb(50, 50, 50);
+}
+
+LoadingBarWindow QPushButton:hover {
+    color: lime;
+}
+
+LoadingBarWindow QLabel {
+    color: lime;
+    /* font-weight: bold; */
+    background-color: rgb(10, 10, 10);
+    font-family: "DejaVu Sans Mono";
+}
+
 EditWindow HeaderLabel {
     color: lime;
     /* font-weight: bold; */

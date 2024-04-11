@@ -18,7 +18,9 @@ class volume_controller:
         self.volume = cast(interface, POINTER(IAudioEndpointVolume))
 
     def get_volume(self):
-        return self.volume.GetMasterVolumeLevelScalar() * 100
+        # Rounding fixes a bug where the volume slider would slowly creep down over time.
+        # Some kind of floor function in Windows created an inconsistent feedback loop.
+        return round(self.volume.GetMasterVolumeLevelScalar() * 100, 0)
 
     def set_volume(self, value):
         value = min(1, max(0, value / 100))

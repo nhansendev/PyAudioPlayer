@@ -25,6 +25,7 @@ Start In: `<parent folder path>`
 
 By default any .mp3 and .wav files in the music folder will be loaded.
 
+<!-- TODO: update replaces this with a GUI button/window... maybe keep both -->
 # Utilities
 ## Volume Normalization
 This utility uses the normalize effect from [pydub](https://github.com/jiaaro/pydub/blob/master/API.markdown) to target a more uniform volume across audio files.

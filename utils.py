@@ -7,11 +7,11 @@
 import os
 import sys
 import subprocess
-from metadata import read_metadata, check_normalized, set_normalized
+from metadata import read_metadata, set_normalized
 from multiprocessing import get_context, Pool
 from ffmpeg import probe
 from pydub import AudioSegment, effects
-from tqdm import tqdm
+from pydub.exceptions import CouldntDecodeError
 
 
 def set_volume(val):
@@ -87,60 +87,27 @@ def find_songs(filepath, extensions=[".mp3", ".wav"], printout=None):
 
     _prnt(f"Found {len(songs)} song(s)")
 
-    return _parallel_read_metadata(songs, filepath)
-
-
-def _get_metadata(basepath, song):
-    path = os.path.join(basepath, song)
-    dur = sec_to_HMS(float(probe(path)["format"]["duration"]))
-    return [song, dur] + read_metadata(path)
-
-
-def _parallel_read_metadata(song_set, filepath):
-    # Using spawn for compatability between Unix and Windows
-    with get_context("spawn").Pool() as p:
-        temp = p.starmap(
-            _get_metadata,
-            list(zip(*[[filepath] * len(song_set), song_set])),
-        )
-
-    return temp
+    out = []
+    for song in songs:
+        data = read_metadata(os.path.join(filepath, song))
+        out.append([song, sec_to_HMS(data[0])] + data[1:])
+    return out
 
 
 def _norm(path):
-    tmp = effects.normalize(AudioSegment.from_mp3(path))
-    tmp.export(path, format="mp3", bitrate="128k")
+    try:
+        tmp = effects.normalize(AudioSegment.from_mp3(path))
+    except CouldntDecodeError:
+        return
 
-    set_normalized(path, None, "True")
-
-
-def volume_normalizer(basepath, songs=None):
-    if songs is None:
-        songs = _search_dir(basepath)
-    print(f"Checking {len(songs)} file(s)...")
-    to_convert = []
-    for s in songs:
-        path = os.path.join(basepath, s)
-        if not check_normalized(path):
-            to_convert.append(path)
-
-    if len(to_convert) > 0:
-        print("Processing...")
-        with Pool() as p:
-            with tqdm(total=len(to_convert)) as TQ:
-                for _ in p.imap_unordered(_norm, to_convert):
-                    TQ.update()
-
-        print(f"Done, normalized: {len(to_convert)} files")
-    else:
-        print("Nothing found to normalize.")
+    try:
+        tmp.export(path, format="mp3", bitrate="128k")
+        set_normalized(path, None, "True")
+    except PermissionError:
+        return
 
 
 if __name__ == "__main__":
-    try:
-        path = sys.argv[1]
-        if not os.path.exists(path):
-            raise
-        volume_normalizer(path)
-    except IndexError:
-        pass
+    usedchar = "\u2007"
+    print("100% | ".rjust(7, usedchar))
+    print("0% | ".rjust(7, usedchar))
