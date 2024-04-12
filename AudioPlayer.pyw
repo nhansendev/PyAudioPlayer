@@ -299,6 +299,11 @@ class MainWindow(QMainWindow):
             for d in data:
                 self.song_table.add_row(d)
 
+    def closeEvent(self, event):
+        # Ensure all sub-windows close with the main window
+        for window in QApplication.topLevelWidgets():
+            window.close()
+
 
 if __name__ == "__main__":
     try:

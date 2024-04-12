@@ -725,7 +725,6 @@ class DLFrame(QWidget):
         self.can_close = True
 
 
-# TODO: thread may continue even after popup window is closed. This is not good.
 class NormWorkerThread(QObject):
     done = Signal()
     check_progress = Signal()
@@ -767,7 +766,6 @@ class NormWorkerThread(QObject):
         self.finished.emit()
 
 
-# TODO: popup window may remain open even after main window is closed. Allowable?
 class NormalizerWindow(QWidget):
     def __init__(self, music_folder, songs, msg_label, norm_event):
         super().__init__()
@@ -781,6 +779,7 @@ class NormalizerWindow(QWidget):
         self._progress_bar_chars = 50
         self._interrupt_event = Event()
         self._do_norm = False
+        self._ignore_updates = False
 
         # Apparently the only "space" character that is consistently wide
         self._just_char = "\u2007"  # "Figure Space"
@@ -857,6 +856,7 @@ class NormalizerWindow(QWidget):
 
     def _cancel_thread(self):
         self._interrupt_event.set()
+        self._ignore_updates = True
         pct = (
             f"{int(self._norm_progress / len(self.songs)*100)}% | ".rjust(
                 7, self._just_char
@@ -877,6 +877,8 @@ class NormalizerWindow(QWidget):
 
     @Slot()
     def _increment_check_progress(self, *args):
+        if self._ignore_updates:
+            return
         self._check_progress += 1
         rat = self._check_progress / len(self.songs)
         pct = f"{int(rat*100)}% | ".rjust(7, self._just_char) + "▒" * int(
@@ -886,6 +888,8 @@ class NormalizerWindow(QWidget):
 
     @Slot()
     def _increment_norm_progress(self, *args):
+        if self._ignore_updates:
+            return
         self._norm_progress += 1
         rat = self._norm_progress / len(self.songs)
         pct = f"{int(rat*100)}% | ".rjust(7, self._just_char) + "▒" * int(
@@ -895,6 +899,14 @@ class NormalizerWindow(QWidget):
 
     def close(self):
         self.norm_event.clear()
+        try:
+            if not self.thread.isFinished():
+                self._cancel_thread()
+                self.thread.quit()
+                self.thread.wait()
+        except RuntimeError:
+            # Already deleted thread
+            pass
         super().close()
 
 

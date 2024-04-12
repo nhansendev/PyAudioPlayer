@@ -108,6 +108,4 @@ def _norm(path):
 
 
 if __name__ == "__main__":
-    usedchar = "\u2007"
-    print("100% | ".rjust(7, usedchar))
-    print("0% | ".rjust(7, usedchar))
+    pass
