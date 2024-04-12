@@ -38,12 +38,13 @@ def read_metadata(path):
 def check_normalized(path):
     try:
         tags = mutagen.File(path).tags
-    except mutagen.mp3.HeaderNotFoundError:
+    except (mutagen.mp3.HeaderNotFoundError, FileNotFoundError):
         return False
 
     for k in tags.keys():
         if "norm" in k.lower():
-            return True
+            # State is stored as a string
+            return tags[k] == "True"
     return False
 
 
@@ -62,8 +63,8 @@ def set_normalized(basepath, songname, state):
         acodec="copy",
         metadata=f"Norm={state}",
     )
-    out = ffmpeg.overwrite_output(out)
-    ffmpeg.run(out, quiet=True)
+
+    ffmpeg.run(out, quiet=True, overwrite_output=True)
 
     os.replace(tmp_name, original_name)
 
@@ -90,13 +91,15 @@ def write_metadata(basepath, songname, genre, year):
 
 
 if __name__ == "__main__":
-    import time
-    import mutagen
+    pass
 
-    folder = "D:\\Songs"
-    songpath = "D:\\Songs\\3 Doors Down - Here Without You.mp3"
+    # import time
+    # import mutagen
 
-    print(mutagen.File(songpath).info.length)
+    # folder = "D:\\Songs"
+    # songpath = "D:\\Songs\\3 Doors Down - Here Without You.mp3"
+
+    # print(mutagen.File(songpath).info.length)
 
     # N = 100
     # st = time.time()

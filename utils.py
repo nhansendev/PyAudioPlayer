@@ -5,11 +5,8 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
-import sys
 import subprocess
 from metadata import read_metadata, set_normalized
-from multiprocessing import get_context, Pool
-from ffmpeg import probe
 from pydub import AudioSegment, effects
 from pydub.exceptions import CouldntDecodeError
 
@@ -109,3 +106,23 @@ def _norm(path):
 
 if __name__ == "__main__":
     pass
+
+    # from metadata import check_normalized
+
+    # path = "D:\\Songs\\Meh"
+    # songs = os.listdir(path)
+    # N = len(songs)
+
+    # def check_norm():
+    #     for s in songs:
+    #         print(f"{check_normalized(os.path.join(path, s))}, {s}")
+
+    # def clear_norm():
+    #     for i, s in enumerate(songs):
+    #         if i > 0 and i % (N // 10) == 0:
+    #             print(f"{i+1}/{N} completed")
+    #         set_normalized(path, s, False)
+    #     print(f"{i+1}/{N} completed")
+
+    # check_norm()
+    # clear_norm()
