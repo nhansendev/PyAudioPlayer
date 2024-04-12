@@ -28,6 +28,11 @@ By default any .mp3 and .wav files in the music folder will be loaded.
 <!-- TODO: update replaces this with a GUI button/window... maybe keep both -->
 # Utilities
 ## Volume Normalization
+**Update: 4/11/2024**
+This is also accessible via a button on the bottom-right corner of the GUI:
+
+![image](https://github.com/nhansendev/PyAudioPlayer/assets/9289200/0af1b9a0-6a59-44e7-8442-d878e9bedf64)
+
 This utility uses the normalize effect from [pydub](https://github.com/jiaaro/pydub/blob/master/API.markdown) to target a more uniform volume across audio files.
 Once a file has been normalize a tag is added to its metadata ("Norm=True"), which allows it to be ignored in the future.
 
