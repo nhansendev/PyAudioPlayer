@@ -5,3 +5,4 @@ yt_dlp
 PySide6
 pydub
 tqdm
+superqt
