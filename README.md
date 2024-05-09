@@ -3,6 +3,12 @@ An audio player GUI with yt_dlp integration, made in python using PySide6.
 
 ![AP_linux](https://github.com/nhansendev/PyAudioPlayer/assets/9289200/c632a38c-6c31-41a6-9f70-f541480fdd0c)
 
+Right-click any song to edit its data in the table:
+![image](https://github.com/nhansendev/PyAudioPlayer/assets/9289200/f26582c6-08f6-45b3-8581-93e626831d06)
+
+Middle-click any song to trim the beginning/end:
+![image](https://github.com/nhansendev/PyAudioPlayer/assets/9289200/e1b843cc-74f5-4d1c-830b-3242a06981f1)
+
 # Requirements
 ## System
 - Python 3.11
