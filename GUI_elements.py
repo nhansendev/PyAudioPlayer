@@ -1133,7 +1133,7 @@ class TrimSongWindow(QWidget):
         self.graph = SongBarGraph(bins, duration)
         self.layout.addWidget(self.graph, stretch=1)
 
-        self.song_label = QLabel(f"Trimming: {self.songname}")
+        self.song_label = QLabel(f"     Trimming: {self.songname}")
         self.song_label.setStyleSheet(
             "background-color: rgb(220, 220, 220); color: black; font-weight: bold; font-size: 15px;"
         )
