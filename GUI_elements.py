@@ -30,6 +30,11 @@ def load_stylesheet(obj):
     obj.setStyleSheet(ss)
 
 
+# DEBUG
+# def _norm(*args):
+#     time.sleep(0.5)
+
+
 class SongTable(QTableWidget):
     rclick = Signal(object, object)
 
@@ -199,6 +204,9 @@ class SearchBar(QWidget):
 
     def conn(self, command):
         self.search_box.textChanged.connect(partial(command, self.dropdown.currentText))
+
+    def refresh(self):
+        self.search_box.textChanged.emit(self.search_box.text())
 
 
 class PlayBar(QWidget):
@@ -778,7 +786,6 @@ class NormalizerWindow(QWidget):
         self._norm_progress = 0
         self._progress_bar_chars = 50
         self._interrupt_event = Event()
-        self._do_norm = False
         self._ignore_updates = False
 
         # Apparently the only "space" character that is consistently wide
@@ -849,7 +856,6 @@ class NormalizerWindow(QWidget):
         if qty > 0:
             self.status_label2.setText(f"Normalizing {qty} songs...")
             self.cancel_button.pressed.connect(self._cancel_thread)
-            self._do_norm = True
         else:
             self.status_label2.setText("Nothing found to normalize.")
             self.progress_bar2.setText("")
@@ -869,10 +875,11 @@ class NormalizerWindow(QWidget):
     @Slot()
     def _done(self, *args):
         self.cancel_button.setText("Ok")
-        if self._do_norm:
-            # This will fail at runtime if there is nothing to disconnect
-            # Lack of clear error message is a pain
+        try:
             self.cancel_button.pressed.disconnect()
+        except RuntimeError:
+            # This will fail at runtime if there is nothing to disconnect
+            pass
         self.cancel_button.pressed.connect(self.close)
 
     @Slot()
@@ -920,6 +927,7 @@ class LoadingBarWindow(QWidget):
         self._progress = 0
         self._progress_bar_chars = 50
         self.songs = []
+        self._running = False
 
         self.setWindowFlags(Qt.WindowStaysOnTopHint)
 
@@ -992,10 +1000,12 @@ class LoadingBarWindow(QWidget):
         self.progress_bar.setText(pct)
 
     def _done(self, data):
+        self._running = False
         self.done.emit(data)
 
     def load_metadata(self):
         if len(self.songs) > 0:
+            self._running = True
             self.worker = MetadataWorkerThread(self.songs, self.filepath)
             self.worker.done.connect(self.hide)
             self.worker.progress.connect(self._increment_progress)

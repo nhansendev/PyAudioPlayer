@@ -91,24 +91,12 @@ def write_metadata(basepath, songname, genre, year):
 
 
 if __name__ == "__main__":
-    pass
+    folder = "D:\\Songs\\Meh"
 
-    # import time
-    # import mutagen
+    songs = os.listdir(folder)
 
-    # folder = "D:\\Songs"
-    # songpath = "D:\\Songs\\3 Doors Down - Here Without You.mp3"
-
-    # print(mutagen.File(songpath).info.length)
-
-    # N = 100
-    # st = time.time()
-    # for _ in range(N):
-    #     mutagen.File(songpath).keys()
-    #     # read_metadata(songpath)
-    # print(f"{(time.time()-st)/N:.3f} sec avg")
-
-    # st = time.time()
-    # for f in os.listdir(folder):
-    #     read_metadata(f)
-    # print(f"{time.time()-st:.3f} sec")
+    slen = len(songs)
+    for i, s in enumerate(songs):
+        if i % (slen // 10) == 0:
+            print(f"Progress: {i+1}/{slen} ({(i+1)/slen:.1%})")
+        set_normalized(folder, s, False)

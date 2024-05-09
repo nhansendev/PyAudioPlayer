@@ -250,9 +250,12 @@ class MainWindow(QMainWindow):
         self.player.seek(self.play_buttons.seek_slider.get_slider_pct())
 
     def refresh_table(self):
-        self.song_table.clearContents()
-        self.song_table.setRowCount(0)
-        self.find_songs()
+        if not self.meta_loadingbar._running:
+            self.song_table.clearContents()
+            self.song_table.setRowCount(0)
+            self.find_songs()
+            # Without this the search would ignore the existing text after refresh
+            QTimer.singleShot(500, self.search_bar.refresh)
 
     def _update_loop(self):
         if (
