@@ -7,10 +7,34 @@
 from PySide6.QtWidgets import *
 from PySide6.QtCore import Qt, Signal, QTimer
 import os
+from PySide6.QtWidgets import QWidget
 import yt_dlp
+from superqt import QDoubleRangeSlider
 
 
 class ReservedSlider(QSlider):
+    # Tracks whether the user is interacting with the slider
+    # Useful for preventing self-updates to the slider position at the wrong time
+    def __init__(self, unreserve_delay=1000):
+        super().__init__()
+
+        self.unreserve_delay = unreserve_delay
+        self.reserved = False
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.reserved = False
+
+        return super().mouseReleaseEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.reserved = True
+
+        return super().mousePressEvent(event)
+
+
+class ReservedRangeSlider(QDoubleRangeSlider):
     # Tracks whether the user is interacting with the slider
     # Useful for preventing self-updates to the slider position at the wrong time
     def __init__(self, unreserve_delay=1000):
@@ -144,3 +168,39 @@ class LineEditDefaultText(QLineEdit):
 
     def return_conn(self, command):
         self.returnPressed.connect(command)
+
+
+class LabelSpinBox(QWidget):
+    def __init__(self, text="", minimum=0, maximum=1):
+        super().__init__()
+
+        self.layout = QHBoxLayout()
+        self.setLayout(self.layout)
+
+        self.label = QLabel(text)
+        self.layout.addWidget(self.label)
+
+        self.spinbox = QDoubleSpinBox()
+        self.spinbox.setMinimum(minimum)
+        self.spinbox.setMaximum(maximum)
+        self.layout.addWidget(self.spinbox)
+
+    def set_value(self, value):
+        self.spinbox.setValue(value)
+
+    def get_value(self):
+        return self.spinbox.value()
+
+
+# TODO: WIP
+class WindowOverlay(QWidget):
+    def __init__(self, text):
+        super().__init__()
+
+        self.setAutoFillBackground(True)
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+
+        self.setStyleSheet("background-color: black;")
+
+        self.label = QLabel(text)

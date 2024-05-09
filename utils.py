@@ -6,9 +6,11 @@
 
 import os
 import subprocess
+import array
 from metadata import read_metadata, set_normalized
 from pydub import AudioSegment, effects
 from pydub.exceptions import CouldntDecodeError
+from pydub.utils import get_array_type
 
 
 def set_volume(val):
@@ -104,8 +106,61 @@ def _norm(path):
         return
 
 
+def trim_song(basedir, songname, sttime_s, entime_s, flag=None):
+    # importing file from location by giving its path
+    sound = AudioSegment.from_mp3(os.path.join(basedir, songname))
+
+    # Opening file and extracting portion of it
+    extract = sound[sttime_s * 1000.0 : entime_s * 1000.0]
+
+    # Saving file in required location
+    extract.export(os.path.join(basedir, songname), format="mp3")
+
+    if flag is not None:
+        flag.set()
+
+
+def song_to_numeric(basedir, songname, include_duration=True):
+    sound = AudioSegment.from_mp3(os.path.join(basedir, songname))
+    if include_duration:
+        return (
+            array.array(get_array_type(sound.sample_width * 8), sound.raw_data),
+            sound.duration_seconds,
+        )
+    else:
+        return array.array(get_array_type(sound.sample_width * 8))
+
+
+def max_amplitude_binning(data, num_bins):
+    binwidth = len(data) // num_bins
+    bins = []
+
+    for b in range(num_bins + 1):
+        bins.append(max([abs(v) for v in data[b * binwidth : (b + 1) * binwidth]]))
+
+    return bins
+
+
 if __name__ == "__main__":
-    pass
+    import matplotlib.pyplot as plt
+
+    basedir = "D:\\Songs\\Meh"
+    songname = "Kid Rock - Born Free.mp3"
+
+    data, duration = song_to_numeric(basedir, songname)
+
+    bins = max_amplitude_binning(data, 300)
+    step = duration / len(bins)
+
+    plt.bar(
+        [i * step for i in range(len(bins))],
+        [2 * b for b in bins],
+        width=1,
+        bottom=[-b for b in bins],
+        edgecolor="k",
+    )
+    # plt.grid()
+    plt.show()
 
     # from metadata import check_normalized
 

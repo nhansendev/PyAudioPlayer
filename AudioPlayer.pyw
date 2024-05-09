@@ -12,8 +12,9 @@ import os
 from threading import Event
 from formatting import FormatLabel
 from GUI_elements import *
-from utils import sec_to_HMS
+from utils import sec_to_HMS, song_to_numeric, max_amplitude_binning
 import sys
+from pydub.exceptions import CouldntDecodeError
 
 import platform
 
@@ -82,6 +83,9 @@ class audioplayer:
             return self.player.curr_pos / self.player.duration
 
 
+# Cause of "Failed to initialize COM library (Cannot change thread mode after it is set.)" error?
+
+
 class MainWindow(QMainWindow):
     def __init__(
         self,
@@ -94,11 +98,13 @@ class MainWindow(QMainWindow):
         self.meta_loadingbar.done.connect(self.add_entries)
 
         self._editing_event = Event()
+        self._trimming_event = Event()
         self._normalize_event = Event()
         self.load_stylesheet()
 
         self.player = audioplayer(music_folder)
         self.edit_window = None
+        self.trim_window = None
         self.norm_window = None
         self.music_folder = music_folder
         self._play_on_load = True
@@ -134,6 +140,7 @@ class MainWindow(QMainWindow):
         self.song_table.set_headers(["Name", "Duration", "Genre", "Year"])
         self.song_table.conn(self.load_selection)
         self.song_table.connRClick(self.edit_popup)
+        self.song_table.connMClick(self.trim_popup)
 
         self.azbar = AZLinks(self.song_table)
 
@@ -205,6 +212,7 @@ class MainWindow(QMainWindow):
             if tmp:
                 self._editing_event.set()
 
+        # TODO: Nothing stops the user from re-selecting the song with the window open
         if (
             self.song_table.get_selection() is not None
             and selection[0].data(0) == self.song_table.get_selection()[0]
@@ -225,6 +233,50 @@ class MainWindow(QMainWindow):
             )
             self.edit_window.move_to_center(self, override_y=mpos.y())
             self.edit_window.show()
+
+    def trim_popup(self, selection, mpos):
+        if self.trim_window is not None:
+            tmp = self._trimming_event.is_set()
+            self.trim_window.close()
+            if tmp:
+                self._trimming_event.set()
+
+        # TODO: Nothing stops the user from re-selecting the song with the window open
+        if (
+            self.song_table.get_selection() is not None
+            and selection[0].data(0) == self.song_table.get_selection()[0]
+        ):
+            # Can't edit the currently loaded song on Windows
+            # Linux is more flexible
+            if _OS == "WINDOWS":
+                self._editing_event.set()
+                self.player.pause(True)
+                self.player.player = Playback()
+                self.play_buttons.update_state(None, self._play_on_load)
+                self.song_table.clearSelection()
+                self.message_label.setText("Warning: Can't edit song while selected.")
+
+        if len(selection) > 0:
+            try:
+                data, duration = song_to_numeric(
+                    self.music_folder, selection[0].data(0)
+                )
+            except CouldntDecodeError:
+                self.message_label.setText(f"Unable to edit: {selection[0].data(0)}")
+                self._trimming_event.clear()
+                return
+
+            bins = max_amplitude_binning(data, 300)
+            self.trim_window = TrimSongWindow(
+                self.music_folder,
+                selection,
+                bins,
+                duration,
+                self.message_label,
+                self._trimming_event,
+            )
+            self.trim_window.move_to_center(self, override_y=mpos.y())
+            self.trim_window.show()
 
     def find_songs(self):
         self.meta_loadingbar.raise_()

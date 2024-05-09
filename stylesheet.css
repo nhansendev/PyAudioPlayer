@@ -164,7 +164,7 @@ QSlider {
 }
 
 QSlider::groove {
-    color: rgb(25, 25, 25);
+    color: rgb(255, 255, 255);
 }
 
 QSlider::handle {

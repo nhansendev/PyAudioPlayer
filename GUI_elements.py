@@ -6,11 +6,30 @@
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import Qt, Signal, QTimer, QObject, Slot, QThread
+from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import QWidget
+from PySide6.QtCharts import (
+    QChart,
+    QStackedBarSeries,
+    QBarSet,
+    QValueAxis,
+    QChartView,
+)
 
 from formatting import SliderProxyStyle, HeaderLabel, TitleLabel, FormatLabel
-from element_bases import ClickableSlider, LineEditDefaultText, ytd
+from element_bases import (
+    ClickableSlider,
+    LineEditDefaultText,
+    ytd,
+    ReservedRangeSlider,
+)
 from metadata import write_metadata, check_normalized, read_metadata
-from utils import _norm, _search_dir, sec_to_HMS
+from utils import (
+    _norm,
+    _search_dir,
+    sec_to_HMS,
+    trim_song,
+)
 
 from functools import partial
 import random
@@ -18,7 +37,8 @@ import os
 import time
 from interruptable_thread import ThreadWithExc
 import yt_dlp
-from multiprocessing import Pool, cpu_count, Event
+from multiprocessing import Pool, cpu_count, Event, Process
+from utils import sec_to_HMS
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +57,7 @@ def load_stylesheet(obj):
 
 class SongTable(QTableWidget):
     rclick = Signal(object, object)
+    mclick = Signal(object, object)
 
     def __init__(self):
         super(SongTable, self).__init__()
@@ -77,8 +98,8 @@ class SongTable(QTableWidget):
         self.itemSelectionChanged.connect(command)
 
     def mousePressEvent(self, event):
-        # Don't change the selection when right-clicking to edit
-        if event.button() != Qt.RightButton:
+        # Don't change the selection when right-clicking or middle-clicking to edit
+        if event.button() == Qt.LeftButton:
             return super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -86,10 +107,17 @@ class SongTable(QTableWidget):
             row = self.rowAt(event.position().y())
             sel = [self.item(row, c) for c in range(self.columnCount())]
             self.rclick.emit(sel, self.mapToGlobal(event.position()))
+        elif event.button() == Qt.MiddleButton:
+            row = self.rowAt(event.position().y())
+            sel = [self.item(row, c) for c in range(self.columnCount())]
+            self.mclick.emit(sel, self.mapToGlobal(event.position()))
         return super().mouseReleaseEvent(event)
 
     def connRClick(self, command):
         self.rclick.connect(command)
+
+    def connMClick(self, command):
+        self.mclick.connect(command)
 
     def set_headers(self, headers, widths=None):
         self.setColumnCount(len(headers))
@@ -1044,3 +1072,267 @@ class MetadataWorkerThread(QObject):
         self.data.emit(out)
         self.done.emit()
         self.finished.emit()
+
+
+class TrimWorkerThread(QObject):
+    done = Signal()
+
+    def __init__(self, basedir, songname, L, R) -> None:
+        super().__init__()
+        self.basedir = basedir
+        self.songname = songname
+        self.L = L
+        self.R = R
+
+    @Slot()
+    def run(self):
+        self.p = Process(
+            target=trim_song, args=(self.basedir, self.songname, self.L, self.R)
+        )
+        self.p.start()
+        self.p.join()
+
+        self.done.emit()
+
+
+class TrimSongWindow(QWidget):
+    def __init__(
+        self, basedir, selection, bins, duration, message_label, trimming_event
+    ):
+        super().__init__()
+        self.basedir = basedir
+        self.songname = selection[0].data(0)
+        self.selection = selection
+        self._message_label = message_label
+        self._trimming_event = trimming_event
+        self._busy_event = Event()
+
+        self.setFixedWidth(1000)
+        self.setMinimumHeight(500)
+
+        self.setAutoFillBackground(True)
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setContentsMargins(0, 0, 0, 0)
+
+        self.title_layout = QVBoxLayout()
+        self.title_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(self.title_layout)
+
+        self.layout = QVBoxLayout()
+        self.layout_widget = QWidget()
+        self.layout_widget.setLayout(self.layout)
+        self.layout.setContentsMargins(3, 0, 3, 3)
+        self.layout.setSpacing(3)
+
+        self.title = TitleBar(self, "Trim Song Length", close_only=True)
+        self.title_layout.addWidget(self.title)
+        self.title_layout.addWidget(self.layout_widget, stretch=1)
+        load_stylesheet(self.title)
+
+        self.graph = SongBarGraph(bins, duration)
+        self.layout.addWidget(self.graph, stretch=1)
+
+        self.song_label = QLabel(f"Trimming: {self.songname}")
+        self.song_label.setStyleSheet(
+            "background-color: rgb(220, 220, 220); color: black; font-weight: bold; font-size: 15px;"
+        )
+        self.layout.addWidget(self.song_label)
+
+        self.processing_label = QLabel("Processing...")
+        self.processing_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.processing_label.setStyleSheet("font-weight: bold; font-size: 50px;")
+        self.processing_label.setFixedHeight(110)
+        self.layout.addWidget(self.processing_label)
+        self.processing_label.hide()
+
+        self.pos_slider = ReservedRangeSlider()
+        self.pos_slider.setOrientation(Qt.Orientation.Horizontal)
+        self.pos_slider.setRange(-1, self.graph.duration + 1)
+        self.pos_slider.setBarIsRigid(False)
+        self.pos_slider.setValue((0, self.graph.duration))
+
+        self.slider_frame = QFrame()
+        self.slider_frame.setContentsMargins(40, 0, 40, 0)
+        self.frame_layout = QVBoxLayout()
+        self.slider_frame.setLayout(self.frame_layout)
+        self.frame_layout.addWidget(self.pos_slider)
+        self.layout.addWidget(self.slider_frame)
+
+        self.spinbox_frame = QFrame()
+        self.spinbox_layout = QHBoxLayout()
+        self.spinbox_frame.setLayout(self.spinbox_layout)
+        self.frame_layout.addWidget(self.spinbox_frame)
+
+        self.spinbox_label = QLabel("Keep: ")
+        self.spinbox_layout.addWidget(self.spinbox_label)
+
+        self.left_spinbox = QDoubleSpinBox()
+        self.left_spinbox.setMinimum(0)
+        self.left_spinbox.setMaximum(self.graph.duration)
+        self.right_spinbox = QDoubleSpinBox()
+        self.right_spinbox.setMinimum(0)
+        self.right_spinbox.setMaximum(self.graph.duration)
+        self.left_spinbox.valueChanged.connect(self._left_spin_changed)
+        self.right_spinbox.valueChanged.connect(self._right_spin_changed)
+
+        self.spinbox_label2 = QLabel(" to ")
+        self.spinbox_layout.addWidget(self.left_spinbox, stretch=1)
+        self.spinbox_layout.addWidget(self.spinbox_label2)
+        self.spinbox_layout.addWidget(self.right_spinbox, stretch=1)
+
+        self.pos_slider.sliderMoved.connect(self._moved_event)
+        self.pos_slider.sliderPressed.connect(self._slider_clicked)
+
+        self.button_frame = QFrame()
+        self.button_layout = QHBoxLayout()
+        self.button_frame.setLayout(self.button_layout)
+        self.frame_layout.addWidget(self.button_frame)
+
+        self.confirm_button = QPushButton("OK")
+        self.confirm_button.pressed.connect(self._trim_song)
+        self.button_layout.addWidget(self.confirm_button)
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.pressed.connect(self.close)
+        self.button_layout.addWidget(self.cancel_button)
+
+        self._slider_clicked()
+
+    def _slider_clicked(self):
+        self._moved_event(self.pos_slider.value())
+
+    def _moved_event(self, event):
+        L, R = event
+        self.graph.set_highlighted(L, R)
+        self.left_spinbox.setValue(L)
+        self.right_spinbox.setValue(R)
+
+    def _left_spin_changed(self, val):
+        if not self.pos_slider.reserved:
+            self.pos_slider.setValue((val, self.right_spinbox.value()))
+            self.graph.set_highlighted(val, self.right_spinbox.value())
+
+    def _right_spin_changed(self, val):
+        if not self.pos_slider.reserved:
+            self.pos_slider.setValue((self.left_spinbox.value(), val))
+            self.graph.set_highlighted(self.left_spinbox.value(), val)
+
+    def _trim_song(self):
+        L, R = self.pos_slider.value()
+        if L <= 0 and R >= self.graph.duration:
+            self._message_label.setText(
+                f"No trimming performed: zero trim length selected"
+            )
+            self.close()
+            return
+
+        self._show_processing()
+
+        self.worker = TrimWorkerThread(self.basedir, self.songname, L, R)
+        self.worker.done.connect(self._done)
+
+        self.thread = QThread()
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.done.connect(self.thread.quit)
+        self.worker.done.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+
+    def _show_processing(self):
+        self.slider_frame.hide()
+        self.processing_label.show()
+
+    def _done(self):
+        # Finished processing
+        L, R = self.pos_slider.value()
+        self.selection[1].setText(sec_to_HMS(R - L))
+        self._message_label.setText(f"Trimmed: {self.songname}")
+        self.close()
+
+    def move_to_center(self, parent, override_x=None, override_y=None):
+        px = override_x if override_x is not None else parent.x()
+        py = override_y if override_y is not None else parent.y()
+
+        pw, ph = parent.width(), parent.height()
+
+        self.move(px + pw / 2 - self.width() / 2, py + ph / 2 - self.height() / 2)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Enter:
+            self._trim_song()
+        event.accept()
+
+    def close(self):
+        self._trimming_event.clear()
+        super().close()
+
+
+class SongBarGraph(QWidget):
+    def __init__(self, bins, duration):
+        super().__init__()
+
+        self.duration = duration
+        self.bins = bins
+
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
+        self.dataset = QBarSet("data")
+        self.dataset.append(bins)
+        self.dataset.setColor("black")
+        self.dataset.setBorderColor("gray")
+        self.dataset.setSelectedColor("red")
+        self.neg_dataset = QBarSet("-data")
+        self.neg_dataset.setColor("black")
+        self.neg_dataset.setBorderColor("black")
+        self.neg_dataset.setSelectedColor("red")
+        self.neg_dataset.append([-b for b in bins])
+
+        self._series = QStackedBarSeries()
+        self._series.setBarWidth(1)
+        self._series.append(self.dataset)
+        self._series.append(self.neg_dataset)
+
+        self.chart = QChart()
+        self.chart.legend().setVisible(False)
+
+        self._x_axs = QValueAxis()
+        self._x_axs.setRange(0, duration)
+        self._x_axs.setTickCount(duration // 15)
+        self._x_axs.applyNiceNumbers()
+        self._x_axs.setTitleText("Seconds")
+
+        # Note: will produce a warning: "Series not in the chart. Please addSeries to chart first."
+        # The warning should be ignored. The current order is necessary for the custom axis ticks
+        # and bars to sync up automatically
+        self.chart.addAxis(self._x_axs, Qt.AlignmentFlag.AlignBottom)
+        self._series.attachAxis(self._x_axs)
+        self.chart.addSeries(self._series)
+
+        self._chart_view = QChartView(self.chart)
+        self._chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.layout.addWidget(self._chart_view)
+
+    def set_highlighted(self, L, R):
+        idx = int(len(self.bins) * (L / self.duration))
+        idx2 = int(len(self.bins) * (R / self.duration))
+
+        sel_idx = [i for i in range(len(self.bins)) if i < idx or i >= idx2]
+
+        self.dataset.deselectAllBars()
+        self.neg_dataset.deselectAllBars()
+        self.dataset.selectBars(sel_idx)
+        self.neg_dataset.selectBars(sel_idx)
+
+
+if __name__ == "__main__":
+
+    app = QApplication()
+
+    basedir = "D:\\Songs\\Meh"
+    songname = "Kid Rock - Born Free.mp3"
+    TW = TrimSongWindow(basedir, songname)
+    TW.show()
+
+    app.exec()
