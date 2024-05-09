@@ -347,6 +347,8 @@ class VolumeSlider(QWidget):
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
 
+        self._just_char = "\u2007"
+
         self.label = QLabel("0")
         self.label.setFixedWidth(26)
         self.layout.addWidget(self.label)
@@ -374,7 +376,7 @@ class VolumeSlider(QWidget):
         self.slider.valueChanged.connect(command)
 
     def set_label(self, value):
-        self.label.setText(str(value))
+        self.label.setText(str(value).center(3, self._just_char))
 
 
 class EditWindow(QWidget):
