@@ -12,6 +12,21 @@ import yt_dlp
 from superqt import QDoubleRangeSlider
 
 
+class TimedMessageLabel(QLabel):
+    def __init__(self, delay_ms=10000):
+        super().__init__()
+        self.delay_ms = delay_ms
+
+    def setText(self, msg, auto_clear=True):
+        super().setText(msg)
+
+        if auto_clear:
+            QTimer.singleShot(self.delay_ms, self.clear)
+
+    def clear(self):
+        super().setText("")
+
+
 class ReservedSlider(QSlider):
     # Tracks whether the user is interacting with the slider
     # Useful for preventing self-updates to the slider position at the wrong time

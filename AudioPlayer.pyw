@@ -11,6 +11,7 @@ from just_playback import Playback, ma_result
 import os
 from threading import Event
 from formatting import FormatLabel
+from element_bases import TimedMessageLabel
 from GUI_elements import *
 from utils import sec_to_HMS, song_to_numeric, max_amplitude_binning
 import sys
@@ -150,7 +151,8 @@ class MainWindow(QMainWindow):
         self.volume_bar = VolumeSlider()
         self.volume_bar.conn_move(set_volume)
 
-        self.message_label = FormatLabel()
+        # self.message_label = FormatLabel()
+        self.message_label = TimedMessageLabel()
 
         self.YTD = YTD_Widget(music_folder)
 
