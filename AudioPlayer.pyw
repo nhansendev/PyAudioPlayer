@@ -17,6 +17,12 @@ from utils import sec_to_HMS, song_to_numeric, max_amplitude_binning
 import sys
 from pydub.exceptions import CouldntDecodeError
 
+import ctypes
+
+# Fix icon display on taskbar
+myappid = "mycompany.myproduct.subproduct.version"  # arbitrary string
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+
 import platform
 
 if "Windows" in platform.system():
@@ -117,7 +123,7 @@ class MainWindow(QMainWindow):
         self.resize(800, 600)
 
         self.icon = QIcon()
-        self.icon.addFile(os.path.join(SCRIPT_DIR, "icon.png"))
+        self.icon.addFile(os.path.join(SCRIPT_DIR, "icon.ico"))
         self.setWindowIcon(self.icon)
 
         self.layout = QGridLayout()
