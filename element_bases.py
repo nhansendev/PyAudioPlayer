@@ -124,9 +124,10 @@ class DefaultLogger:
 def ytd(URL, dir, logger=DefaultLogger()):
     # yt-dlp configured for audio-only downloads
     outformat = os.path.join(dir, "%(title)s.%(ext)s")
+    # "format": '251/bestaudio/"bestvideo[height<=?720]"',
 
     ydl_opts = {
-        "format": '251/bestaudio/"bestvideo[height<=?720]"',
+        "format": "bestaudio",
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -136,6 +137,7 @@ def ytd(URL, dir, logger=DefaultLogger()):
         ],
         "logger": logger,
         "outtmpl": outformat,
+        # "cookiesfrombrowser": ("chrome",),
         # "verbose": True,
         # "no-cache-dir": True,
     }

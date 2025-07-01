@@ -7,6 +7,7 @@
 import os
 import ffmpeg
 import mutagen
+from mutagen.mp3 import MP3
 
 
 def read_metadata(path):
@@ -14,7 +15,8 @@ def read_metadata(path):
         return [0, "Unknown", None]
 
     try:
-        file = mutagen.File(path)
+        # file = mutagen.File(path)
+        file = MP3(path)  # much faster
     except mutagen.mp3.HeaderNotFoundError:
         return [0, "Unknown", None]
 
@@ -90,13 +92,36 @@ def write_metadata(basepath, songname, genre, year):
     os.replace(tmp_name, original_name)
 
 
+def write_db_csv(folder, data):
+    # Assume data in [name, duration, genre, year] format
+    outstr = "\n".join([",".join([str(d) for d in entry]) for entry in data])
+    with open(os.path.join(folder, "_meta_db.csv"), "bw") as f:
+        f.write(outstr.encode())
+
+
+def read_db_csv(folder):
+    # Assume data in [name, duration, genre, year] format
+    with open(os.path.join(folder, "_meta_db.csv"), "br") as f:
+        lines = f.readlines()
+
+    return [line.decode().strip().split(",") for line in lines]
+
+
 if __name__ == "__main__":
     folder = "D:\\Songs\\Meh"
+    read_db_csv(folder)
 
-    songs = os.listdir(folder)
+    # songs = os.listdir(folder)
 
-    slen = len(songs)
-    for i, s in enumerate(songs):
-        if i % (slen // 10) == 0:
-            print(f"Progress: {i+1}/{slen} ({(i+1)/slen:.1%})")
-        set_normalized(folder, s, False)
+    # song_data = []
+    # for song in songs:
+    #     tmp = read_metadata(os.path.join(folder, song))
+    #     song_data.append([song] + tmp)
+
+    # write_db_csv(folder, song_data)
+
+    # slen = len(songs)
+    # for i, s in enumerate(songs):
+    #     if i % (slen // 10) == 0:
+    #         print(f"Progress: {i+1}/{slen} ({(i+1)/slen:.1%})")
+    #     set_normalized(folder, s, False)

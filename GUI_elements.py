@@ -14,9 +14,17 @@ from PySide6.QtCharts import (
     QBarSet,
     QValueAxis,
     QChartView,
+    QCategoryAxis,
 )
 
-from formatting import SliderProxyStyle, HeaderLabel, TitleLabel, FormatLabel
+from formatting import (
+    SliderProxyStyle,
+    HeaderLabel,
+    TitleLabel,
+    FormatLabel,
+    TitleButton,
+    SubTitleLabel,
+)
 from element_bases import (
     ClickableSlider,
     LineEditDefaultText,
@@ -29,6 +37,7 @@ from utils import (
     _search_dir,
     sec_to_HMS,
     trim_song,
+    check_chars,
 )
 
 from functools import partial
@@ -69,6 +78,8 @@ class SongTable(QTableWidget):
         # Only rows and single selections
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
         self.setSortingEnabled(True)
         self.setAlternatingRowColors(True)
@@ -145,6 +156,11 @@ class SongTable(QTableWidget):
             return sel[0].row()
         else:
             return -1
+
+    def scrollToSelected(self):
+        sel = self.selectionModel().selectedRows(0)
+        if len(sel) > 0:
+            self.scrollTo(sel[0])
 
     def get_visible_rows(self):
         indexes = []
@@ -246,7 +262,7 @@ class PlayBar(QWidget):
         self.layout.setSpacing(1)
         self.setLayout(self.layout)
 
-        self.song_label = FormatLabel("Nothing Playing")
+        self.song_label = TitleButton("Nothing Playing")
 
         self.slider_holder = QWidget()
         self.slider_holder_layout = QHBoxLayout()
@@ -268,6 +284,9 @@ class PlayBar(QWidget):
 
         self.checkables = {}
         self._internal_slider_set = False
+
+    def connect_navigate(self, command):
+        self.song_label.pressed.connect(command)
 
     def update_progress(self, duration_text):
         self.duration_label.setText(duration_text)
@@ -471,6 +490,10 @@ class EditWindow(QWidget):
         idx = 0
         for i in range(len(self.old_data)):
             if not i in self.skipped_indexes:
+                chrs = check_chars(tmp[idx])
+                if chrs:
+                    self.msg_label.setText(f"Illegal characters: {' '.join(chrs)}")
+                    return
                 self.selection[i].setText(tmp[idx])
                 idx += 1
 
@@ -528,7 +551,9 @@ class AZLinks(QWidget):
 
 
 class TitleBar(QWidget):
-    def __init__(self, window, title, hide_on_close=False, close_only=False):
+    def __init__(
+        self, window, title, subtitle=None, hide_on_close=False, close_only=False
+    ):
         super().__init__()
 
         self.hide_on_close = hide_on_close
@@ -558,9 +583,14 @@ class TitleBar(QWidget):
         self.closeButton.setFixedWidth(30)
         self.closeButton.pressed.connect(self._close)
 
+        if subtitle is not None:
+            self.subtitle = SubTitleLabel(subtitle)
+            self.layout.addWidget(self.subtitle)
+
         self.layout.addWidget(
             self.title, stretch=1, alignment=Qt.AlignmentFlag.AlignHCenter
         )
+
         if not close_only:
             self.layout.addWidget(self.minButton)
             self.layout.addWidget(self.maxButton)
@@ -1299,11 +1329,41 @@ class SongBarGraph(QWidget):
         self.chart = QChart()
         self.chart.legend().setVisible(False)
 
-        self._x_axs = QValueAxis()
-        self._x_axs.setRange(0, duration)
-        self._x_axs.setTickCount(duration // 15)
-        self._x_axs.applyNiceNumbers()
-        self._x_axs.setTitleText("Seconds")
+        self._x_axs = QCategoryAxis()
+        self._x_axs.setMin(0)
+        self._x_axs.setMax(duration)
+        self._x_axs.setStartValue(0)
+
+        widths = [5, 10, 15, 30, 45, 60, 120, 180, 240, 480]
+        best_width = None
+        best_diff = None
+        for w in widths:
+            tmp = abs(int(duration / w) - 15)
+            if best_diff is None or tmp < best_diff:
+                best_diff = tmp
+                best_width = w
+
+        if best_diff > 10:
+            # For very long files
+            best_width = int(duration / 15)
+        # width = max(30, int(duration / 15))
+
+        ivals = int(duration / best_width) + 1
+        ticks = [best_width * i for i in range(ivals)]
+        tick_str = [f"{int(t/60)}:{int(t) % 60:02}" for t in ticks]
+        for i in range(ivals):
+            self._x_axs.append(tick_str[i], ticks[i])
+
+        self._x_axs.setLabelsPosition(
+            QCategoryAxis.AxisLabelsPosition.AxisLabelsPositionOnValue
+        )
+        self._x_axs.setTitleText("Time (mm:ss)")
+
+        # self._x_axs = QValueAxis()
+        # self._x_axs.setRange(0, duration)
+        # self._x_axs.setTickCount(duration // 15)
+        # self._x_axs.applyNiceNumbers()
+        # self._x_axs.setTitleText("Seconds")
 
         # Note: will produce a warning: "Series not in the chart. Please addSeries to chart first."
         # The warning should be ignored. The current order is necessary for the custom axis ticks
@@ -1329,12 +1389,35 @@ class SongBarGraph(QWidget):
 
 
 if __name__ == "__main__":
+    from utils import max_amplitude_binning, song_to_numeric
+
+    class Callable:
+        def __init__(self, value):
+            self.value = value
+
+        def __call__(self, *args, **kwds):
+            return self.value
+
+    class Sel:
+        def __init__(self, songname):
+            self.data = Callable(songname)
 
     app = QApplication()
 
-    basedir = "D:\\Songs\\Meh"
-    songname = "Kid Rock - Born Free.mp3"
-    TW = TrimSongWindow(basedir, songname)
+    basedir = "D:\\Songs"
+    # basedir = "D:\\Songs\\Meh"
+    songname = "Ephixa - Wanderer.mp3"
+    # songname = "Kid Rock - Born Free.mp3"
+    data, duration = song_to_numeric(basedir, songname)
+    bins = max_amplitude_binning(data, 300)
+
+    dummy_selection = [Sel(songname)]
+    dummy_label = QLabel("")
+    dummy_event = Event()
+
+    TW = TrimSongWindow(
+        basedir, dummy_selection, bins, duration, dummy_label, dummy_event
+    )
     TW.show()
 
     app.exec()

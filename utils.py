@@ -7,10 +7,15 @@
 import os
 import subprocess
 import array
+import time
 from metadata import read_metadata, set_normalized
 from pydub import AudioSegment, effects
 from pydub.exceptions import CouldntDecodeError
 from pydub.utils import get_array_type
+import re
+from functools import partial
+
+check_chars = partial(re.findall, r'[\/:*?"<>|’]')
 
 
 def set_volume(val):
@@ -141,26 +146,44 @@ def max_amplitude_binning(data, num_bins):
     return bins
 
 
+def get_version(dir):
+    with open(os.path.join(dir, "info.txt"), "r") as f:
+        return f.readline().strip("\n")
+
+
+def iterate_version():
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    filepath = os.path.join(SCRIPT_DIR, "info.txt")
+    version = float(get_version(SCRIPT_DIR))
+
+    with open(filepath, "w") as f:
+        f.write(f"{version+0.01:.2f}\n")
+        f.write(str(time.time()) + "\n")
+
+
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
+    # import matplotlib.pyplot as plt
 
-    basedir = "D:\\Songs\\Meh"
-    songname = "Kid Rock - Born Free.mp3"
+    # basedir = "D:\\Songs\\Meh"
+    # songname = "Kid Rock - Born Free.mp3"
 
-    data, duration = song_to_numeric(basedir, songname)
+    # data, duration = song_to_numeric(basedir, songname)
 
-    bins = max_amplitude_binning(data, 300)
-    step = duration / len(bins)
+    # bins = max_amplitude_binning(data, 300)
+    # step = duration / len(bins)
 
-    plt.bar(
-        [i * step for i in range(len(bins))],
-        [2 * b for b in bins],
-        width=1,
-        bottom=[-b for b in bins],
-        edgecolor="k",
-    )
-    # plt.grid()
-    plt.show()
+    # plt.bar(
+    #     [i * step for i in range(len(bins))],
+    #     [2 * b for b in bins],
+    #     width=1,
+    #     bottom=[-b for b in bins],
+    #     edgecolor="k",
+    # )
+    # # plt.grid()
+    # plt.show()
+
+    # iterate_version()
+    # print(get_version("D:\\Atom\\PyAudioPlayer"))
 
     # from metadata import check_normalized
 
@@ -181,3 +204,16 @@ if __name__ == "__main__":
 
     # check_norm()
     # clear_norm()
+
+    import re
+    from functools import partial
+
+    # check_chars = partial(
+    #     re.findall, "[^ a-zA-Z0-9_\\.\\-\\(\\)\\'\\!\\&\\,\\[\\]\\$\\@]"
+    # )
+    check_chars = partial(re.findall, r'[\/:*?"<>|’]')
+
+    for s in os.listdir("D:\\Songs"):
+        tmp = check_chars(s)
+        if tmp:
+            print(s, " ".join(tmp))

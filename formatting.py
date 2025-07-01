@@ -4,7 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-from PySide6.QtWidgets import QLabel, QProxyStyle, QStyle, QHeaderView
+from PySide6.QtWidgets import QLabel, QProxyStyle, QStyle, QHeaderView, QPushButton
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette
 
@@ -14,7 +14,17 @@ class FormatLabel(QLabel):
     pass
 
 
+class TitleButton(QPushButton):
+    # For easier use of the stylesheet
+    pass
+
+
 class TitleLabel(QLabel):
+    # For easier use of the stylesheet
+    pass
+
+
+class SubTitleLabel(QLabel):
     # For easier use of the stylesheet
     pass
 

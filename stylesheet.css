@@ -117,6 +117,14 @@ TitleBar TitleLabel {
     font-size: 15px;
 }
 
+TitleBar SubTitleLabel {
+    color: white;
+    font-weight: bold;
+    background-color: rgb(40, 40, 40);
+    font-family: "DejaVu Sans Mono";
+    font-size: 10px;
+}
+
 QLabel {
     color: rgb(0, 200, 0);
     /* font-weight: bold; */
@@ -150,6 +158,18 @@ QPushButton {
 }
 
 QPushButton:hover {
+    color: lime;
+}
+
+TitleButton {
+    background-color: rgb(0, 0, 0);
+    color: rgb(0, 200, 0);
+    font-family: "DejaVu Sans Mono";
+    font-size: 15px;
+    /* border: 1px solid rgb(50, 50, 50); */
+}
+
+TitleButton:hover {
     color: lime;
 }
 

@@ -13,7 +13,13 @@ from threading import Event
 from formatting import FormatLabel
 from element_bases import TimedMessageLabel
 from GUI_elements import *
-from utils import sec_to_HMS, song_to_numeric, max_amplitude_binning
+from utils import (
+    sec_to_HMS,
+    song_to_numeric,
+    max_amplitude_binning,
+    get_version,
+    check_chars,
+)
 import sys
 from pydub.exceptions import CouldntDecodeError
 
@@ -58,8 +64,10 @@ class audioplayer:
             if play_on_load:
                 self.player.play()
             return True
-        except (ma_result.MiniaudioError, FileNotFoundError):
+        except (ma_result.MiniaudioError, FileNotFoundError) as e:
+            # print(e)
             # print(f"Can't load:", os.path.join(self.filepath, info[0]))
+
             return False
 
     def set_loop(self, state):
@@ -90,7 +98,8 @@ class audioplayer:
             return self.player.curr_pos / self.player.duration
 
 
-# Cause of "Failed to initialize COM library (Cannot change thread mode after it is set.)" error?
+# TODO: Cause of "Failed to initialize COM library (Cannot change thread mode after it is set.)" error?
+# TODO: more helpful error message when song is unplayable
 
 
 class MainWindow(QMainWindow):
@@ -132,7 +141,7 @@ class MainWindow(QMainWindow):
         self.layout.setContentsMargins(3, 10, 3, 0)
         self.layout.setSpacing(5)
 
-        self.title = TitleBar(self, "Audio Player")
+        self.title = TitleBar(self, "Audio Player", get_version(SCRIPT_DIR))
 
         self.title_layout = QVBoxLayout()
         self.title_layout.setContentsMargins(0, 0, 0, 0)
@@ -336,6 +345,12 @@ class MainWindow(QMainWindow):
         sel = self.song_table.get_selection()
         if sel is not None:
             self.play_buttons.update_state(sel[0], self._play_on_load)
+
+            tmp = check_chars(sel[0])
+            if tmp:
+                self.message_label.setText(f"Illegal chars in name: {' '.join(tmp)}")
+                return
+
             if not self.player._load_song(sel, self._play_on_load):
                 self.message_label.setText(
                     f"ERROR: Can't load song: {sel[0]}. Check filename."
@@ -344,6 +359,7 @@ class MainWindow(QMainWindow):
                 self.manual_unpause = False
 
     def add_buttons(self):
+        self.play_buttons.connect_navigate(self.song_table.scrollToSelected)
         self.play_buttons.add_button("<<<", self.song_table.prev, False, False)
         self.play_buttons.add_button("Play/Pause", self._pause, True, False)
         self.play_buttons.add_button(">>>", self.song_table.next, False, False)
